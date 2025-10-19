@@ -11,5 +11,5 @@ server {
         return 302 ${QSSO_LOGIN_URL};
     }
 
-    // ...
+    # 其他配置自行添加.
 }
