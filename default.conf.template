@@ -1,0 +1,14 @@
+server {
+    listen ${NGINX_PORT};
+    server_name ${NGINX_SERVER_NAME};
+
+    location = /qsso_backcall {
+      content_by_lua_file /usr/local/openresty/nginx/lua/qsso_backcall.lua;
+    }
+
+    location = /signin {
+        return 302 ${QSSO_LOGIN_URL};
+    }
+
+    // ...
+}
