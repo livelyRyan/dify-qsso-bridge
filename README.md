@@ -1,77 +1,58 @@
 # Dify QSSO Bridge
 
-> 🔐 一个基于 OpenResty 的 Dify SSO 登录桥接方案，实现非侵入式的企业级单点登录集成
+> 🔐 A non-invasive SSO integration solution for Dify using OpenResty, enabling enterprise single sign-on without modifying Dify source code
 
-## 📖 项目简介
+English | [简体中文](README.zh-CN.md)
 
-`dify-qsso-bridge` 是一个通用的 Dify SSO 登录解决方案，通过 OpenResty（Nginx + Lua）实现网关层的登录拦截和 Token 映射，无需修改 Dify 源代码即可接入企业内部的 SSO 认证系统。
+## 📖 Overview
 
-本方案以 QSSO 为例，但架构设计具有通用性，可轻松适配其他 SSO 系统（如 CAS、OAuth2、SAML 等）。
+`dify-qsso-bridge` is a universal SSO bridge solution for Dify that implements gateway-level authentication interception and token mapping through OpenResty (Nginx + Lua), eliminating the need to modify Dify's source code for enterprise SSO integration.
 
-## ✨ 核心特性
+While this solution uses QSSO as an example, the architecture is designed to be universal and can be easily adapted to other SSO systems (CAS, OAuth2, SAML, etc.).
 
-- 🚀 **非侵入式设计** - 无需修改 Dify 源代码，便于版本升级维护
-- 🔒 **安全可靠** - Token 传递具有时效性，支持完整的认证流程
-- 🎯 **网关层拦截** - 在 OpenResty 层面处理登录逻辑，性能开销小
-- 🔧 **易于扩展** - 清晰的架构设计，可快速适配其他 SSO 系统
-- 📝 **完整日志** - Trace ID 贯穿全流程，便于问题排查
-- 🐳 **容器化部署** - 基于 Docker Compose，开箱即用
+## ✨ Key Features
 
-## 🏗️ 架构设计
+- 🚀 **Non-invasive Design** - No modifications to Dify source code, easy to maintain and upgrade
+- 🔒 **Secure & Reliable** - Token exchange with expiration, complete authentication flow
+- 🎯 **Gateway-level Interception** - Authentication logic handled at OpenResty layer with minimal overhead
+- 🔧 **Extensible** - Clear architecture design, quick adaptation to other SSO systems
+- 📝 **Complete Logging** - Trace ID throughout the entire flow for easy troubleshooting
 
-### 方案对比
+## 🏗️ Architecture
 
-| 方案 | 描述 | 优劣势 | 选型 |
-|------|------|--------|------|
-| **登录代码修改** | 修改 dify-web 和 dify-api 源码实现 SSO 映射 | ❌ 版本升级维护成本高 | ❌ |
-| **网关 + Lua** | 使用 OpenResty 在网关层拦截和处理登录 | ✅ 非侵入、易维护、可扩展 | ✅ |
+### Solution Comparison
 
-### 认证流程
+| Solution | Description | Pros & Cons | Chosen |
+|----------|-------------|-------------|--------|
+| **Modify Dify Code** | Modify dify-web and dify-api source code for SSO mapping | ❌ High maintenance cost on version upgrades | ❌ |
+| **Gateway + Lua** | Use OpenResty to intercept and handle authentication at gateway layer | ✅ Non-invasive, maintainable, extensible | ✅ |
 
-> 💡 **建议补充：** 此处可以添加更美观的流程图（如 draw.io、mermaid 等工具绘制）
+### Authentication Flow
 
-```
-┌─────────┐         ┌──────────────┐         ┌──────────┐         ┌──────────────┐
-│  用户   │────1───>│   OpenResty  │────2───>│   QSSO   │         │ Dify 管理服务│
-│ 浏览器  │         │   (网关)     │         │  登录页  │         │             │
-└─────────┘         └──────────────┘         └──────────┘         └──────────────┘
-     ▲                      │                      │                       ▲
-     │                      │                      │                       │
-     │                      │         3. 认证成功   │                       │
-     │                      │        重定向回调     │                       │
-     │                      ◄──────────────────────┘                       │
-     │                      │                                               │
-     │                      │                                               │
-     │                      │─────────4. 调用 API 获取 Dify Token──────────>│
-     │                      │                                               │
-     │                      │◄────────5. 返回 access_token & refresh_token──│
-     │                      │                                               │
-     └──────6. 重定向到 Dify 首页（携带 Token）─────┘
-```
+![flowchart](./images/flowchart.png)
 
-**流程说明：**
+**Flow Details:**
 
-1. 用户访问 Dify，Token 过期后重定向到 `/signin`
-2. OpenResty 拦截 `/signin`，重定向到 QSSO 登录页（带回调地址）
-3. QSSO 认证成功后，回调到 `/qsso_backcall`（携带 QSSO Token）
-4. Lua 脚本拦截 `/qsso_backcall`，提取 QSSO Token 并调用 Dify 管理服务
-5. Dify 管理服务验证 QSSO Token，创建/获取 Dify 用户，返回 Dify Token
-6. OpenResty 重定向到 Dify 首页，完成登录
+1. User accesses Dify, gets redirected to `/signin` when token expires
+2. OpenResty intercepts `/signin`, redirects to QSSO login page (with callback URL)
+3. QSSO authenticates user and calls back to `/qsso_backcall` (with QSSO token)
+4. Lua script intercepts `/qsso_backcall`, extracts QSSO token and calls Dify Management Service
+5. Dify Management Service validates QSSO token, creates/retrieves Dify user, returns Dify tokens
+6. OpenResty redirects to Dify homepage with tokens, completing the login
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 前置要求
+### Prerequisites
 
-- Docker & Docker Compose
-- 已部署的 Dify 实例
-- SSO 认证系统（如 QSSO）
-- Dify 管理服务（用于 Token 映射）
+- Deployed Dify instance
+- SSO authentication system (e.g., QSSO)
+- Dify Management Service (for token mapping)
 
-### 安装步骤
+### Installation Steps
 
-#### 1. 构建 OpenResty 镜像
+#### 1. Build OpenResty Image
 
-官方 `openresty/openresty:alpine-fat` 镜像不包含 `lua-resty-http` 模块，需要自行构建：
+The official `openresty/openresty:alpine-fat` image doesn't include the `lua-resty-http` module. Build a custom image:
 
 ```dockerfile
 # Dockerfile
@@ -81,118 +62,93 @@ RUN luarocks install lua-resty-openssl
 ```
 
 ```bash
-# 构建镜像（建议替换为你自己的镜像仓库地址）
+# Build the image (replace with your own registry)
 docker build -t your-registry/openresty:alpine-fat .
 ```
 
-#### 2. 修改 Docker Compose 配置
+#### 2. Configure Environment Variables
 
-将 Dify 原有的 Nginx 服务替换为 OpenResty：
-
-```yaml
-# docker-compose.yaml
-services:
-  nginx:
-    image: your-registry/openresty:alpine-fat  # 使用你构建的镜像
-    restart: always
-    volumes:
-      - ./nginx/nginx.conf.template:/etc/nginx/nginx.conf.template
-      - ./nginx/conf.d/default.conf.template:/etc/nginx/conf.d/default.conf.template
-      - ./nginx/lua:/usr/local/openresty/nginx/lua
-      - ./nginx/docker-entrypoint.sh:/docker-entrypoint.sh
-    environment:
-      - DIFY_TOKEN_BY_QSSO_API_BASE_URL=${DIFY_TOKEN_BY_QSSO_API_BASE_URL}
-      - DIFY_HOME_PAGE_BASE_URL=${DIFY_HOME_PAGE_BASE_URL}
-      - QSSO_LOGIN_URL=${QSSO_LOGIN_URL}
-```
-
-#### 3. 配置环境变量
-
-在 `.env` 文件中添加以下配置：
+Set the following environment variables in your deployment:
 
 ```env
-# Dify 管理服务 API 地址（用于获取 Dify Token）
-DIFY_TOKEN_BY_QSSO_API_BASE_URL=http://host.docker.internal:8087/get_dify_token
+# Dify Management Service API endpoint for token exchange
+DIFY_TOKEN_BY_QSSO_API_BASE_URL=http://api.internal:8087/get_dify_token
 
-# Dify 首页地址
+# Dify homepage URL (redirect destination after successful login)
 DIFY_HOME_PAGE_BASE_URL=http://dify.yourdomain.com/apps
 
-# QSSO 登录页地址（包含回调地址）
+# QSSO login page URL (including callback URL parameter)
 QSSO_LOGIN_URL=https://qsso.yourdomain.com/login.php?ret=http%3A%2F%2Fdify.yourdomain.com%2Fqsso_backcall
+
+# Nginx configuration
+NGINX_PORT=80
+NGINX_SERVER_NAME=localhost
 ```
 
-⚠️ **注意：** 请将 `yourdomain.com` 替换为实际的域名
+⚠️ **Note:** Replace `yourdomain.com` with your actual domain
 
-#### 4. 配置 OpenResty
+#### 3. Configure OpenResty
 
-在 `nginx/conf.d/default.conf.template` 中添加：
+Add the following configuration to your `nginx.conf`:
+
+```nginx
+# Declare environment variables (make them accessible to Lua)
+env DIFY_TOKEN_BY_QSSO_API_BASE_URL;
+env DIFY_HOME_PAGE_BASE_URL;
+
+http {
+    # Docker internal DNS resolution
+    resolver 127.0.0.11 valid=30s;
+    
+    # Other configurations...
+}
+```
+
+The site configuration is provided in `nginx/conf.d/default.conf.template`:
 
 ```nginx
 server {
     listen ${NGINX_PORT};
     server_name ${NGINX_SERVER_NAME};
 
-    # QSSO 回调处理
+    # QSSO callback handler - processes SSO authentication response
     location = /qsso_backcall {
-        content_by_lua_file /usr/local/openresty/nginx/lua/qsso_backcall.lua;
+      content_by_lua_file /usr/local/openresty/nginx/lua/qsso_backcall.lua;
     }
 
-    # 登录拦截，重定向到 QSSO
+    # Login interceptor - redirects to QSSO login page
     location = /signin {
         return 302 ${QSSO_LOGIN_URL};
     }
 
-    # 其他 Dify 路由配置...
+    # Add your other Dify proxy configurations below
 }
 ```
 
-在 `nginx/nginx.conf` 中添加环境变量声明和 DNS 解析：
+#### 4. Deploy Lua Script
 
-```nginx
-# 声明环境变量（让 Lua 可以访问）
-env DIFY_TOKEN_BY_QSSO_API_BASE_URL;
-env DIFY_HOME_PAGE_BASE_URL;
+Place the `qsso_backcall.lua` script in the `nginx/lua/` directory. The script is included in this repository and handles the token exchange logic.
 
-http {
-    # Docker 内网 DNS 解析
-    resolver 127.0.0.11 valid=30s;
-    
-    # 其他配置...
-}
-```
+## ⚙️ Configuration
 
-#### 5. 部署 Lua 脚本
+### Environment Variables
 
-将 `qsso_backcall.lua` 脚本放置在 `nginx/lua/` 目录下（脚本内容见项目仓库）。
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `DIFY_TOKEN_BY_QSSO_API_BASE_URL` | Dify Management Service endpoint for token exchange | `http://api.internal:8087/get_dify_token` |
+| `DIFY_HOME_PAGE_BASE_URL` | Dify homepage URL, redirect destination after login | `http://dify.yourdomain.com/apps` |
+| `QSSO_LOGIN_URL` | SSO login page URL with callback parameter | `https://sso.yourdomain.com/login?ret=...` |
 
-#### 6. 启动服务
+### Dify Management Service API Specification
 
-```bash
-docker-compose up -d nginx
-```
+The Dify Management Service must provide the following API endpoint:
 
-## ⚙️ 配置说明
-
-### 环境变量详解
-
-| 变量名 | 说明 | 示例 |
-|--------|------|------|
-| `DIFY_TOKEN_BY_QSSO_API_BASE_URL` | Dify 管理服务获取 Token 的 API 地址 | `http://api.internal:8087/get_dify_token` |
-| `DIFY_HOME_PAGE_BASE_URL` | Dify 首页地址，登录成功后跳转 | `http://dify.yourdomain.com/apps` |
-| `QSSO_LOGIN_URL` | SSO 登录页地址，需包含回调参数 | `https://sso.yourdomain.com/login?ret=...` |
-
-### Dify 管理服务 API 规范
-
-> 💡 **建议补充：** 此处可以添加 Dify 管理服务的架构图，展示其与 Dify 数据库、QSSO 系统的交互关系
-
-Dify 管理服务需要提供以下接口：
-
-**请求：**
+**Request:**
 ```http
 GET /get_dify_token?trace_id={trace_id}&token={qsso_token}
 ```
 
-**响应：**
+**Response:**
 ```json
 {
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -200,49 +156,49 @@ GET /get_dify_token?trace_id={trace_id}&token={qsso_token}
 }
 ```
 
-**业务逻辑：**
+**Business Logic:**
 
-1. 验证 QSSO Token 的有效性
-2. 查询 Dify 的 `account` 和 `tenant_account` 表
-3. 根据场景处理：
-   - **新用户**：创建账号并加入默认租户
-   - **已存在用户无租户**：重新加入默认租户
-   - **已存在用户有租户**：直接返回 Token
-4. 调用 Dify API 生成并返回 Token
+1. Validate QSSO token authenticity
+2. Query Dify's `account` and `tenant_account` tables
+3. Handle different scenarios:
+   - **New user**: Create account and add to default tenant
+   - **Existing user without tenant**: Re-add to default tenant
+   - **Existing user with tenant**: Return tokens directly
+4. Call Dify API to generate and return tokens
 
-**涉及的 Dify 数据表：**
-- `account` - 用户账号表
-- `tenant_account` - 租户与用户关联表
+**Related Dify Database Tables:**
+- `account` - User account table
+- `tenant_account` - Tenant-user relationship table
 
-## 🔒 安全性说明
+## 🔒 Security
 
-### Token 安全机制
+### Token Security Mechanisms
 
-1. **QSSO Token 时效性**
-   - QSSO Token 验证后立即失效，即使被拦截也无法复用
+1. **QSSO Token Expiration**
+   - QSSO tokens are invalidated immediately after validation, preventing reuse even if intercepted
 
-2. **邀请 Token 保护**
-   - 邮件邀请返回的 Token 具有时效性
-   - 只有首次激活有效，重复激活会失败
+2. **Invitation Token Protection**
+   - Email invitation tokens have expiration time
+   - Only first activation is valid, subsequent attempts fail
 
-3. **登录 Token 保护**
-   - Access Token 和 Refresh Token 具有过期时间
-   - 遵循 Dify 原有的 Token 刷新机制
+3. **Login Token Protection**
+   - Access tokens and refresh tokens have expiration times
+   - Follows Dify's native token refresh mechanism
 
-### 已知安全风险
+### Known Security Considerations
 
-⚠️ 以下风险继承自 Dify 原有设计，非本方案引入：
+⚠️ The following risks are inherited from Dify's original design, not introduced by this solution:
 
-1. **明文传输风险**：激活账号和登录接口使用 POST Body 明文传输（建议在生产环境启用 HTTPS）
-2. **Token 拦截风险**：登录成功返回的 Token 拼接在 URL 中可能被拦截（建议配置短期有效期）
+1. **Plain Text Transmission**: Account activation and login APIs use POST body in plain text (recommend HTTPS in production)
+2. **Token Interception**: Login success returns tokens in URL which could be intercepted (recommend short expiration periods)
 
-## 🐛 常见问题
+## 🐛 Troubleshooting
 
-### 1. 切换 OpenResty 镜像后启动失败
+### 1. OpenResty Image Startup Failed
 
-**原因：** Nginx 和 OpenResty 的配置文件路径不一致
+**Cause:** Nginx and OpenResty have different configuration file paths
 
-**解决方案：** 检查并修改 `docker-compose.yaml` 中的挂载路径：
+**Solution:** Check and modify the volume mount paths in your container configuration:
 
 ```yaml
 volumes:
@@ -251,84 +207,84 @@ volumes:
   - ./nginx/lua:/usr/local/openresty/nginx/lua
 ```
 
-### 2. Lua 脚本找不到 `resty.http` 模块
+### 2. Lua Script Cannot Find `resty.http` Module
 
-**原因：** 官方镜像未包含该模块
+**Cause:** Official image doesn't include this module
 
-**解决方案：** 使用本项目提供的 Dockerfile 重新构建镜像
+**Solution:** Build the custom image using the provided Dockerfile
 
-### 3. QSSO 认证成功后重复跳转登录
+### 3. Infinite Redirect Loop After QSSO Authentication
 
-**原因：** Lua 脚本返回无效 Token 导致登录失败
+**Cause:** Lua script returns invalid tokens, causing login failure
 
-**解决方案：** 
-- 检查 Dify 管理服务 API 是否正常
-- 查看 OpenResty 日志（通过 Trace ID 追踪）：
+**Solution:** 
+- Check if Dify Management Service API is working properly
+- Check OpenResty logs (trace by Trace ID):
   ```bash
   docker logs -f <nginx_container_id> | grep "TRACE_ID"
   ```
 
-### 4. Lua 日志不显示
+### 4. Lua Logs Not Showing
 
-**原因：** Nginx 默认日志级别为 `notice`，Lua 的 `ngx.log` 需要使用 `warn` 级别
+**Cause:** Nginx default log level is `notice`, Lua's `ngx.log` requires `warn` level
 
-**解决方案：** 在 `nginx.conf` 中设置：
+**Solution:** Set in `nginx.conf`:
 
 ```nginx
 error_log /dev/stderr warn;
 ```
 
-### 5. Lua 无法读取环境变量
+### 5. Lua Cannot Read Environment Variables
 
-**原因：** Nginx 工作进程默认不继承所有环境变量
+**Cause:** Nginx worker processes don't inherit all environment variables by default
 
-**解决方案：** 在 `nginx.conf` 顶部显式声明：
+**Solution:** Explicitly declare in `nginx.conf`:
 
 ```nginx
 env DIFY_TOKEN_BY_QSSO_API_BASE_URL;
 env DIFY_HOME_PAGE_BASE_URL;
 ```
 
-### 6. Lua 无法请求外部地址
+### 6. Lua Cannot Request External URLs
 
-**原因：** Docker 容器内的 DNS 解析配置缺失
+**Cause:** Docker container lacks DNS resolution configuration
 
-**解决方案：** 在 `nginx.conf` 的 `http` 块中添加：
+**Solution:** Add to `http` block in `nginx.conf`:
 
 ```nginx
 resolver 127.0.0.11 valid=30s;
 ```
 
-### 7. Token 过期时间不一致
+### 7. Token Expiration Mismatch
 
-- **Dify 先过期**：自动跳转 `/signin` 被拦截重新登录 QSSO ✅ 无需处理
-- **QSSO 先过期**：等待 Dify Token 过期后自动重新登录 ✅ 无需处理
+- **Dify expires first**: Automatically redirects to `/signin`, intercepted for QSSO re-login ✅ No action needed
+- **QSSO expires first**: Wait for Dify token expiration for automatic re-login ✅ No action needed
 
-### 8. 登出按钮不生效
+### 8. Logout Button Not Working
 
-**现状：** 登出后 Dify Token 失效，会立即跳转 QSSO 再次登录
+**Current Behavior:** After logout, Dify token is invalidated, immediately redirects to QSSO for re-login
 
-**临时方案：** 需要同时登出 QSSO 系统（此功能需在 Dify 管理服务中实现）
+**Temporary Solution:** Need to implement simultaneous QSSO logout (this functionality should be implemented in Dify Management Service)
 
-## 🔧 适配其他 SSO 系统
+## 🔧 Adapting to Other SSO Systems
 
-本方案设计具有通用性，适配其他 SSO 系统只需修改以下部分：
+This solution is designed to be universal. Adapting to other SSO systems requires modifying the following:
 
-### 1. 修改环境变量
+### 1. Modify Environment Variables
 
-将 `QSSO_LOGIN_URL` 替换为目标 SSO 的登录地址：
+Replace `QSSO_LOGIN_URL` with your target SSO login URL:
 
 ```env
-# CAS 示例
+# CAS example
 SSO_LOGIN_URL=https://cas.yourdomain.com/login?service=http%3A%2F%2Fdify.yourdomain.com%2Fsso_callback
 
-# OAuth2 示例
+# OAuth2 example
 SSO_LOGIN_URL=https://oauth.yourdomain.com/authorize?client_id=xxx&redirect_uri=http%3A%2F%2Fdify.yourdomain.com%2Fsso_callback
 ```
 
-### 2. 修改回调路由
+### 2. Modify Callback Route
 
-在 `default.conf.template` 中修改路由名称：
+Update the route name in `default.conf.template`:
 
 ```nginx
 location = /sso_callback {
@@ -336,68 +292,67 @@ location = /sso_callback {
 }
 ```
 
-### 3. 修改 Lua 脚本
+### 3. Modify Lua Script
 
-根据目标 SSO 的 Token 传递方式修改 `sso_callback.lua`：
+Adjust `sso_callback.lua` based on your SSO's token delivery method:
 
 ```lua
--- CAS 通常通过 URL 参数传递 ticket
+-- CAS typically passes ticket via URL parameter
 local ticket = ngx.var.arg_ticket
 
--- OAuth2 通常通过 URL 参数传递 code
+-- OAuth2 typically passes code via URL parameter
 local code = ngx.var.arg_code
 ```
 
-### 4. 调整管理服务
+### 4. Adjust Management Service
 
-修改 Dify 管理服务以支持目标 SSO 的 Token 验证逻辑。
+Modify Dify Management Service to support your target SSO's token validation logic.
 
-## 📂 项目结构
+## 📂 Project Structure
 
 ```
 dify-qsso-bridge/
-├── README.md                           # 本文档
-├── Dockerfile                          # OpenResty 镜像构建文件
-├── docker-compose.yaml                 # Docker Compose 配置
-├── .env.example                        # 环境变量示例
+├── README.md                           # English documentation (this document)
+├── README.zh-CN.md                     # Chinese documentation
+├── LICENSE                             # MIT License
+├── .gitignore                          # Git ignore configuration
+├── Dockerfile                          # OpenResty image build file
+├── images/                              # Architecture diagrams and other image resources
 └── nginx/
-    ├── nginx.conf.template             # Nginx 主配置模板
     ├── conf.d/
-    │   └── default.conf.template       # 站点配置模板
-    ├── lua/
-    │   └── qsso_backcall.lua          # QSSO 回调处理脚本
-    └── docker-entrypoint.sh           # 启动脚本
+    │   └── default.conf.template       # Site configuration template
+    └── lua/
+        └── qsso_backcall.lua          # QSSO callback handler script
 ```
 
-## 🤝 贡献指南
+## 🤝 Contributing
 
-欢迎提交 Issue 和 Pull Request！
+Issues and Pull Requests are welcome!
 
-### 贡献流程
+### Contribution Workflow
 
-1. Fork 本仓库
-2. 创建特性分支：`git checkout -b feature/your-feature`
-3. 提交更改：`git commit -am 'Add some feature'`
-4. 推送到分支：`git push origin feature/your-feature`
-5. 提交 Pull Request
+1. Fork this repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Commit your changes: `git commit -am 'Add some feature'`
+4. Push to the branch: `git push origin feature/your-feature`
+5. Submit a Pull Request
 
-### 代码规范
+### Code Standards
 
-- Lua 脚本遵循 [Lua Style Guide](https://github.com/luarocks/lua-style-guide)
-- Nginx 配置遵循官方最佳实践
-- 提交信息遵循 [Conventional Commits](https://www.conventionalcommits.org/)
+- Lua scripts follow [Lua Style Guide](https://github.com/luarocks/lua-style-guide)
+- Nginx configurations follow official best practices
+- Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
 
-## 📄 许可证
+## 📄 License
 
-本项目采用 [MIT License](LICENSE) 开源协议。
+This project is licensed under the [MIT License](LICENSE).
 
-## 🙏 致谢
+## 🙏 Acknowledgments
 
-- [Dify](https://github.com/langgenius/dify) - 优秀的 LLMOps 平台
-- [OpenResty](https://openresty.org/) - 强大的 Web 应用服务器
-- 所有贡献者和使用者
+- [Dify](https://github.com/langgenius/dify) - Excellent LLMOps platform
+- [OpenResty](https://openresty.org/) - Powerful web application server
+- All contributors and users
 
 ---
 
-⭐ 如果这个项目对你有帮助，欢迎 Star 支持！
-
+⭐ If this project helps you, please star it!

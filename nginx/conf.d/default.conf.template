@@ -2,14 +2,17 @@ server {
     listen ${NGINX_PORT};
     server_name ${NGINX_SERVER_NAME};
 
-    # 下面两个 location 为必须
+    # The following two locations are required for SSO integration
+    
+    # QSSO callback handler - processes SSO authentication response
     location = /qsso_backcall {
       content_by_lua_file /usr/local/openresty/nginx/lua/qsso_backcall.lua;
     }
 
+    # Login interceptor - redirects to QSSO login page
     location = /signin {
         return 302 ${QSSO_LOGIN_URL};
     }
 
-    # 其他配置自行添加.
+    # Add your other Dify proxy configurations below
 }

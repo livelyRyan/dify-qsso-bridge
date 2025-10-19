@@ -1,23 +1,23 @@
--- 检查是否是 /qsso_backcall 或 /qsso_backcall/ 路径
+-- Check if the request path is /qsso_backcall or /qsso_backcall/
 if ngx.var.request_uri == "/qsso_backcall" or ngx.var.request_uri == "/qsso_backcall/" then
 
-    -- 生成 trace_id
+    -- Generate trace_id for request tracking
     local trace_id = tostring(ngx.now())
 
-    -- 从环境变量获取配置，如果未设置则使用默认值
+    -- Get configuration from environment variables, use default values if not set
     local dify_token_by_qsso_api_base_url = os.getenv("DIFY_TOKEN_BY_QSSO_API_BASE_URL")
     local dify_home_page_base_url = os.getenv("DIFY_HOME_PAGE_BASE_URL")
-    local custom_error_message_prefix = "登录异常，请联系管理员yanganne.liu，Trace ID: " .. trace_id .. "，错误信息："
+    local custom_error_message_prefix = "Login error, please contact administrator. Trace ID: " .. trace_id .. ", Error: "
 
     ngx.log(ngx.WARN, "redirect_script: [TRACE_ID: ", trace_id, "] dify_token_by_qsso_api_base_url: ", dify_token_by_qsso_api_base_url)
     ngx.log(ngx.WARN, "redirect_script: [TRACE_ID: ", trace_id, "] dify_home_page_base_url: ", dify_home_page_base_url)
     ngx.log(ngx.WARN, "redirect_script: [TRACE_ID: ", trace_id, "] Processing request for ", ngx.var.request_uri)
 
-    -- 加载 http json 解析的库
+    -- Load required libraries for HTTP requests and JSON parsing
     local http = require "resty.http"
     local cjson = require "cjson"
 
-    -- 检查库是否加载成功
+    -- Check if libraries loaded successfully
     if not http or not cjson then
         local missing_libs = {}
         if not http then table.insert(missing_libs, "resty.http") end
@@ -29,12 +29,12 @@ if ngx.var.request_uri == "/qsso_backcall" or ngx.var.request_uri == "/qsso_back
         return
     end
 
-    -- 读取 POST 参数
+    -- Read POST parameters from request body
     ngx.req.read_body()
     local post_args, err_post = ngx.req.get_post_args()
     local initial_token_str = nil
 
-    -- 检查是否成功读取 POST 参数
+    -- Check if POST parameters were read successfully
     if err_post then
         ngx.log(ngx.ERR, "redirect_script: [TRACE_ID: ", trace_id, "] Error getting POST arguments: ", err_post)
         ngx.header.content_type = 'text/plain; charset=utf-8'
@@ -43,7 +43,7 @@ if ngx.var.request_uri == "/qsso_backcall" or ngx.var.request_uri == "/qsso_back
         return
     end
 
-    -- 检查是否存在 'token' 参数
+    -- Check if 'token' parameter exists in POST data
     if post_args and post_args.token then
         if type(post_args.token) == "table" then
             initial_token_str = tostring(post_args.token[1])
@@ -63,24 +63,24 @@ if ngx.var.request_uri == "/qsso_backcall" or ngx.var.request_uri == "/qsso_back
         return
     end
 
-    -- 检查 qsso 的 token 是否为非空字符串
+    -- Validate QSSO token and exchange it for Dify tokens
     if initial_token_str then
         local httpc = http.new()
         local encoded_initial_token = ngx.escape_uri(initial_token_str)
 
-        -- 构建请求 获取dify token 的 URL
+        -- Build request URL to get Dify tokens
         local target_url = dify_token_by_qsso_api_base_url .. "?trace_id=" .. trace_id .. "&token=" .. encoded_initial_token
       
         ngx.log(ngx.WARN, "redirect_script: [TRACE_ID: ", trace_id, "] Requesting Dify token API: ", target_url)
 
-        -- 发起 HTTP 请求
+        -- Send HTTP request to Dify management service
         local res, err_http = httpc:request_uri(target_url, {
             method = "GET",
             timeout = 10000, 
             ssl_verify = false
         })
 
-        -- 检查 HTTP 请求是否成功
+        -- Check if HTTP request was successful
         if not res then
             ngx.log(ngx.ERR, "redirect_script: [TRACE_ID: ", trace_id, "] Failed to request Dify token API '", target_url, "'. Error: ", err_http)
             ngx.header.content_type = 'text/plain; charset=utf-8'
@@ -92,7 +92,7 @@ if ngx.var.request_uri == "/qsso_backcall" or ngx.var.request_uri == "/qsso_back
         ngx.log(ngx.WARN, "redirect_script: [TRACE_ID: ", trace_id, "] Dify token API responded with status: ", res.status)
         httpc:set_keepalive() 
 
-        -- 检查 HTTP 响应状态码
+        -- Check HTTP response status code
         if res.status == ngx.HTTP_OK then
             local data, err_json = cjson.decode(res.body)
             if err_json then
@@ -103,13 +103,13 @@ if ngx.var.request_uri == "/qsso_backcall" or ngx.var.request_uri == "/qsso_back
                 return
             end
 
-            -- 检查响应数据是否包含 access_token 和 refresh_token
+            -- Check if response contains access_token and refresh_token
             if data and data.access_token and data.refresh_token then
                 local access_token = data.access_token
                 local refresh_token = data.refresh_token
                 ngx.log(ngx.WARN, "redirect_script: [TRACE_ID: ", trace_id, "] Successfully retrieved access_token and refresh_token. Redirecting...")
                 
-                -- 构建重定向 URL 跳转到 dify 首页
+                -- Build redirect URL to Dify homepage with tokens
                 local redirect_url_with_tokens = dify_home_page_base_url ..
                                                     "?access_token=" .. access_token ..
                                                     "&refresh_token=" .. refresh_token
